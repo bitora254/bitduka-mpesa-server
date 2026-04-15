@@ -8,6 +8,21 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+const requiredEnv = {
+  DARAJA_CONSUMER_KEY,
+  DARAJA_CONSUMER_SECRET,
+  DARAJA_SHORTCODE,
+  DARAJA_PASSKEY,
+  DARAJA_CALLBACK_URL,
+};
+
+for (const [key, value] of Object.entries(requiredEnv)) {
+  if (!value) {
+    console.error(`Missing environment variable: ${key}`);
+  } else {
+    console.log(`${key} loaded`);
+  }
+}
 
 const PORT = process.env.PORT || 3000;
 
@@ -83,6 +98,20 @@ app.post("/api/mpesa/stk", async (req, res) => {
       TransactionDesc: `BitDuka ${planName} subscription`,
     };
 
+    console.log("STK payload check:", {
+      BusinessShortCode: payload.BusinessShortCode,
+      Timestamp: payload.Timestamp,
+      TransactionType: payload.TransactionType,
+      Amount: payload.Amount,
+      PartyA: payload.PartyA,
+      PartyB: payload.PartyB,
+      PhoneNumber: payload.PhoneNumber,
+      CallBackURL: payload.CallBackURL,
+      AccountReference: payload.AccountReference,
+      TransactionDesc: payload.TransactionDesc,
+      PasswordLength: payload.Password.length,
+    });
+
     const response = await axios.post(
       `${BASE_URL}/mpesa/stkpush/v1/processrequest`,
       payload,
@@ -102,28 +131,24 @@ app.post("/api/mpesa/stk", async (req, res) => {
       responseCode: response.data.ResponseCode,
       customerMessage: response.data.CustomerMessage,
     });
- } catch (error) {
-  const data = error.response?.data;
+  } catch (error) {
+    console.error("STK Push error:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    });
 
-  console.error("STK Push error:", {
-    status: error.response?.status,
-    data,
-    message: error.message,
-  });
-
-  return res.status(500).json({
-    success: false,
-    message:
-      data?.errorMessage ||
-      data?.ResponseDescription ||
-      data?.errorCode ||
-      error.message ||
-      "Could not start STK Push.",
-    details: data || null,
-  });
-}
+    return res.status(500).json({
+      success: false,
+      message:
+        error.response?.data?.errorMessage ||
+        error.response?.data?.ResponseDescription ||
+        error.message ||
+        "Could not start STK Push.",
+      details: error.response?.data || null,
+    });
+  }
 });
-
 app.post("/api/mpesa/callback", (req, res) => {
   console.log("Daraja callback:", JSON.stringify(req.body, null, 2));
   return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
