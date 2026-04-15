@@ -102,18 +102,26 @@ app.post("/api/mpesa/stk", async (req, res) => {
       responseCode: response.data.ResponseCode,
       customerMessage: response.data.CustomerMessage,
     });
-  } catch (error) {
-    const data = error.response?.data;
+ } catch (error) {
+  const data = error.response?.data;
 
-    return res.status(500).json({
-      success: false,
-      message:
-        data?.errorMessage ||
-        data?.ResponseDescription ||
-        "Could not start STK Push.",
-      details: data || null,
-    });
-  }
+  console.error("STK Push error:", {
+    status: error.response?.status,
+    data,
+    message: error.message,
+  });
+
+  return res.status(500).json({
+    success: false,
+    message:
+      data?.errorMessage ||
+      data?.ResponseDescription ||
+      data?.errorCode ||
+      error.message ||
+      "Could not start STK Push.",
+    details: data || null,
+  });
+}
 });
 
 app.post("/api/mpesa/callback", (req, res) => {
