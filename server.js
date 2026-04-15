@@ -8,21 +8,6 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-const requiredEnv = {
-  DARAJA_CONSUMER_KEY,
-  DARAJA_CONSUMER_SECRET,
-  DARAJA_SHORTCODE,
-  DARAJA_PASSKEY,
-  DARAJA_CALLBACK_URL,
-};
-
-for (const [key, value] of Object.entries(requiredEnv)) {
-  if (!value) {
-    console.error(`Missing environment variable: ${key}`);
-  } else {
-    console.log(`${key} loaded`);
-  }
-}
 
 const PORT = process.env.PORT || 3000;
 
@@ -33,6 +18,17 @@ const DARAJA_PASSKEY = process.env.DARAJA_PASSKEY;
 const DARAJA_CALLBACK_URL = process.env.DARAJA_CALLBACK_URL;
 
 const BASE_URL = "https://sandbox.safaricom.co.ke";
+
+console.log("ENV CHECK:", {
+  hasConsumerKey: !!DARAJA_CONSUMER_KEY,
+  consumerKeyLength: DARAJA_CONSUMER_KEY ? DARAJA_CONSUMER_KEY.length : 0,
+  hasConsumerSecret: !!DARAJA_CONSUMER_SECRET,
+  consumerSecretLength: DARAJA_CONSUMER_SECRET ? DARAJA_CONSUMER_SECRET.length : 0,
+  shortcode: DARAJA_SHORTCODE,
+  hasPasskey: !!DARAJA_PASSKEY,
+  passkeyLength: DARAJA_PASSKEY ? DARAJA_PASSKEY.length : 0,
+  callbackUrl: DARAJA_CALLBACK_URL,
+});
 
 function getTimestamp() {
   const now = new Date();
@@ -59,6 +55,8 @@ async function getAccessToken() {
     }
   );
 
+  console.log("TOKEN OK:", !!response.data.access_token);
+
   return response.data.access_token;
 }
 
@@ -82,6 +80,20 @@ app.post("/api/mpesa/stk", async (req, res) => {
       `${DARAJA_SHORTCODE}${DARAJA_PASSKEY}${timestamp}`
     ).toString("base64");
 
+    console.log("REQUEST INPUT:", {
+      phoneNumber,
+      amount,
+      planName,
+    });
+
+    console.log("COMPUTED:", {
+      timestamp,
+      shortcode: DARAJA_SHORTCODE,
+      passkeyLength: DARAJA_PASSKEY ? DARAJA_PASSKEY.length : 0,
+      passwordLength: password.length,
+      callbackUrl: DARAJA_CALLBACK_URL,
+    });
+
     const accessToken = await getAccessToken();
 
     const payload = {
@@ -98,19 +110,7 @@ app.post("/api/mpesa/stk", async (req, res) => {
       TransactionDesc: `BitDuka ${planName} subscription`,
     };
 
-    console.log("STK payload check:", {
-      BusinessShortCode: payload.BusinessShortCode,
-      Timestamp: payload.Timestamp,
-      TransactionType: payload.TransactionType,
-      Amount: payload.Amount,
-      PartyA: payload.PartyA,
-      PartyB: payload.PartyB,
-      PhoneNumber: payload.PhoneNumber,
-      CallBackURL: payload.CallBackURL,
-      AccountReference: payload.AccountReference,
-      TransactionDesc: payload.TransactionDesc,
-      PasswordLength: payload.Password.length,
-    });
+    console.log("PAYLOAD:", payload);
 
     const response = await axios.post(
       `${BASE_URL}/mpesa/stkpush/v1/processrequest`,
@@ -123,6 +123,8 @@ app.post("/api/mpesa/stk", async (req, res) => {
       }
     );
 
+    console.log("STK SUCCESS:", response.data);
+
     return res.json({
       success: true,
       message: "STK Push started successfully.",
@@ -132,10 +134,12 @@ app.post("/api/mpesa/stk", async (req, res) => {
       customerMessage: response.data.CustomerMessage,
     });
   } catch (error) {
-    console.error("STK Push error:", {
+    console.error("STK PUSH ERROR FULL:", {
       status: error.response?.status,
       data: error.response?.data,
+      headers: error.response?.headers,
       message: error.message,
+      code: error.code,
     });
 
     return res.status(500).json({
@@ -149,8 +153,9 @@ app.post("/api/mpesa/stk", async (req, res) => {
     });
   }
 });
+
 app.post("/api/mpesa/callback", (req, res) => {
-  console.log("Daraja callback:", JSON.stringify(req.body, null, 2));
+  console.log("CALLBACK:", JSON.stringify(req.body, null, 2));
   return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
 
